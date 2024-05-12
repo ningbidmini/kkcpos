@@ -1,0 +1,3 @@
+innodb log file siz * innodb log file in group = buffer pool
+skip-name-resolve=1
+open_file_limit (5000)

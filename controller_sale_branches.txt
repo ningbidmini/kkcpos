@@ -1,0 +1,143 @@
+$commissions = DB::table('commission_branches')
+            ->join('sale_payments', 'sale_payments.id', 'commission_branches.sale_payment_id')
+            ->join('customers', 'customers.id', 'sale_payments.customer_id')
+            ->leftJoin('commission_fees', function ($join) {
+                $join->on('commission_fees.sale_payment_id', '=', 'commission_branches.sale_payment_id');
+                $join->on('commission_fees.treatment_id', '=', 'commission_branches.treatment_id');
+            })
+            ->leftJoin('contracts', function ($join) {
+                $join->on('contracts.contract_id', '=', 'sale_payments.contract_id');
+                $join->on('contracts.treatment_id', '=', 'commission_branches.treatment_id');
+            })
+
+            ->select(
+                'commission_branches.id',
+                'commission_branches.commission_percent',
+                'commission_branches.commission_amount',
+                'commission_branches.branch_id as commission_branch_id',
+                'commission_branches.treatment_id',
+                'commission_branches.created_at',
+
+                'sale_payments.id as payment_id',
+                'sale_payments.receipt_number',
+                'sale_payments.total_pay as payment_total_pay',
+                DB::raw('( select  SUM(sale_payments.receipt_number) from sale_payments payments where payments.receipt_number=sale_payments.receipt_number and sale_payments.use_credit_payment is not null and sale_payments.use_credit_payment <>"" group by sale_payments.receipt_number ) as sum_total_payment' ),
+                DB::raw('(select ((SUM(sale_payments.receipt_number)*commission_branches.commission_percent)/100) from sale_payments payments where payments.receipt_number=sale_payments.receipt_number and sale_payments.use_credit_payment is not null and sale_payments.use_credit_payment <> "" group by sale_payments.receipt_number ) as advance' ),
+
+
+                'sale_payments.created_at as payment_created_at',
+                DB::raw('DATE(sale_payments.created_at) as created_at_format'),
+                'sale_payments.branch_id as payment_branch_id',
+                DB::raw('(select branch.branch_prefix from branches branch where branch.id=sale_payments.branch_id group by branch.id) as from_branch'),
+                DB::raw('(select branch.branch_prefix from branches branch where branch.id=commission_branches.branch_id group by branch.id) as to_branch'),
+
+                'sale_payments.course_id',
+                'sale_payments.contract_id',
+                'sale_payments.use_credit_payment',
+
+
+                // DB::raw('(SUM(DISTINCT commission_fees.commission_amount) * commission_branches.commission_percent)/100 as fee '),
+                // DB::raw(' commission_branches.commission_amount - (SUM(DISTINCT commission_fees.commission_amount) * commission_branches.commission_percent)/100 as commission_net'),
+                // DB::raw('case when (select count(contracts.course_name) from contracts where contracts.treatment_id=commission_branches.treatment_id group by contracts.treatment_id)>0 then (select contracts.course_name from contracts where contracts.treatment_id=commission_branches.treatment_id group by contracts.treatment_id) when (select count(credit_sales_types.name) from credit_sale_histories inner join credit_sales_types on credit_sale_histories.saleable_id=credit_sales_types.id where credit_sale_histories.course_id=sale_payments.course_id group by credit_sale_histories.course_id )>0 then (select credit_sales_types.name from credit_sale_histories inner join credit_sales_types on credit_sale_histories.saleable_id=credit_sales_types.id where credit_sale_histories.course_id=sale_payments.course_id group by credit_sale_histories.course_id ) else "Unknown" end as course_name'),
+
+                'commission_fees.id',
+                'commission_fees.commission_amount as commission_fee',
+                DB::raw('SUM(DISTINCT commission_fees.commission_amount) as summation_fee'),  //เกมแก้ของแถมแสดงผลผิด
+
+                'customers.customer_id',
+                'customers.name_th',
+                'contracts.course_name as course_name'
+            )
+            ->where('commission_branches.commission_amount', '>', '0')
+            ->whereNull('sale_payments.deleted_at')
+            ->groupBy('commission_branches.id')
+            ->orderBy('sale_payments.created_at', 'desc');
+
+        // $commissions = DB::table('sale_payments')
+        // ->join('commission_branches', 'sale_payments.id', 'commission_branches.sale_payment_id')
+        // ->join('customers', 'customers.id', 'sale_payments.customer_id')
+        // ->leftJoin('commission_fees', function ($join) {
+        //     $join->on('commission_fees.sale_payment_id', '=', 'commission_branches.sale_payment_id');
+        //     $join->on('commission_fees.treatment_id', '=', 'commission_branches.treatment_id');
+        // })
+        // ->leftJoin('contracts', function ($join) {
+        //     $join->on('contracts.contract_id', '=', 'sale_payments.contract_id');
+        //     $join->on('contracts.treatment_id', '=', 'commission_branches.treatment_id');
+        // })
+        // ->select(
+        //     'commission_branches.id',
+        //     'commission_branches.commission_percent',
+        //     'commission_branches.commission_amount',
+        //     'commission_branches.branch_id as commission_branch_id',
+        //     'commission_branches.treatment_id',
+        //     'commission_branches.created_at',
+        //     'sale_payments.id as payment_id',
+        //     'sale_payments.receipt_number',
+        //     'sale_payments.total_pay as payment_total_pay',
+        //     DB::raw('( select  SUM(DISTINCT sale_payments.receipt_number) from sale_payments payments where payments.receipt_number=sale_payments.receipt_number and sale_payments.use_credit_payment is not null and sale_payments.use_credit_payment <>"" group by sale_payments.receipt_number ) as sum_total_payment' ),
+        //     DB::raw('(select ((SUM(DISTINCT sale_payments.receipt_number)*commission_branches.commission_percent)/100) from sale_payments payments where payments.receipt_number=sale_payments.receipt_number and sale_payments.use_credit_payment is not null and sale_payments.use_credit_payment <> "" group by sale_payments.receipt_number ) as advance' ),
+        //     'sale_payments.created_at as payment_created_at',
+        //     DB::raw('DATE(sale_payments.created_at) as created_at_format'),
+        //     'sale_payments.branch_id as payment_branch_id',
+        //     DB::raw('(select branch.branch_prefix from branches branch where branch.id=sale_payments.branch_id group by branch.id) as from_branch'),
+        //     DB::raw('(select branch.branch_prefix from branches branch where branch.id=commission_branches.branch_id group by branch.id) as to_branch'),
+        //     'sale_payments.course_id',
+        //     'sale_payments.contract_id',
+        //     'sale_payments.use_credit_payment',
+        //     'commission_fees.id',
+        //     'commission_fees.commission_amount as commission_fee',
+        //     DB::raw('SUM(DISTINCT commission_fees.commission_amount) as summation_fee'),
+        //     'customers.customer_id',
+        //     'customers.name_th',
+        //     'contracts.course_name as course_name'
+        // )
+        // ->where('commission_branches.commission_amount', '>', '0')
+        // ->whereNull('sale_payments.deleted_at')
+        // ->groupBy('commission_branches.id')
+        // ->orderBy('sale_payments.created_at', 'desc');
+
+        if (isset($filters['branch_id']) && !empty($filters['branch_id'])) {
+            $commissions->where('commission_branches.branch_id', $filters['branch_id']);
+        }
+
+        if (isset($filters['search']) && !empty($filters['search'])) {
+            $commissions->where('sale_payments.receipt_number', 'LIKE', '%' . $filters['search'] . '%')
+                ->orWhere('customers.customer_id', 'LIKE', '%' . $filters['search'] . '%');
+        }
+
+        if (isset($filters['date_start']) && !empty($filters['date_start'])
+            && isset($filters['date_stop']) && !empty($filters['date_stop'])) {
+
+            // $commissions->whereDate('sale_payments.created_at', '>=', $filters['date_start'])
+            //     ->whereDate('sale_payments.created_at', '<=', $filters['date_stop']);
+            // เปลี่ยนมาใช้งาน จาก SQL between
+            $commissions->whereBetween(DB::raw('date(sale_payments.created_at)'), [$filters['date_start'],$filters['date_stop']]);
+        }
+
+        if (isset($filters['itemsPerPage']) && !empty($filters['itemsPerPage'])
+            && isset($filters['page']) && !empty($filters['page'])) {
+
+            $data = $commissions->paginate($filters['itemsPerPage'], ['*'], $filters['page'], $filters['page']);
+        } else {
+            $data = $commissions->get();
+            // echo $commissions->toSql();
+            // exit;
+        }
+
+        foreach($data as $row) {
+            // ใช้งานคิวรีข้างบนแทน
+            // $row->created_at_format = Carbon::parse($row->payment_created_at)->format('Y-m-d');
+            // ใช้งานคิวรีข้างบนแทน
+            // $row->advance = $this->service->getAdvance($row->receipt_number, $row->commission_percent);
+
+            // ใช้งานคิวรีข้างบนแทน
+            // $row->from_branch = Branch::where('id', $row->payment_branch_id)->value('branch_prefix');
+            // ใช้งานคิวรีข้างบนแทน
+            // $row->to_branch = Branch::where('id', $row->commission_branch_id)->value('branch_prefix');
+
+            $row->fee = $row->summation_fee * $row->commission_percent / 100;
+            $row->course_name = $this->getCourseName($row->contract_id, $row->treatment_id, $row->course_id);
+            $row->commission_net = $row->commission_amount - $row->fee;
+        }
+
+        return $data;

@@ -1,0 +1,11 @@
+receipt_number
+created_at_format
+customer_id
+name_th
+course_name
+commission_amount
+advance
+fee
+commission_net
+from_branch
+to_branch

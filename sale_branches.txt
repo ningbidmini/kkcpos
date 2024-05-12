@@ -1,0 +1,56 @@
+select 
+commission_branches.id
+,commission_branches.commission_percent
+,commission_branches.branch_id as commission_branch_id
+,commission_branches.treatment_id
+,commission_branches.created_at
+
+,sale_payments.id as payment_id
+,sale_payments.receipt_number
+,sale_payments.total_pay as payment_total_pay
+,sale_payments.created_at as payment_created_at
+,sale_payments.branch_id as payment_branch_id
+,sale_payments.course_id
+,sale_payments.contract_id
+
+,SUM(DISTINCT commission_fees.commission_amount) as commission_amount
+
+,round((SUM(DISTINCT commission_fees.commission_amount) * commission_branches.commission_percent ) /100,2) as fee
+
+,( SUM(DISTINCT commission_fees.commission_amount) - round((SUM(DISTINCT commission_fees.commission_amount) * commission_branches.commission_percent ) /100,2) ) as commission_net
+
+
+
+,(select  SUM(DISTINCT sale_payments.receipt_number) from sale_payments payments where payments.receipt_number=sale_payments.receipt_number and sale_payments.use_credit_payment is not null and sale_payments.use_credit_payment <>"" group by sale_payments.receipt_number ) as sum_total_payment 
+
+,(select ((SUM(DISTINCT sale_payments.receipt_number)*commission_branches.commission_percent)/100) from sale_payments payments where payments.receipt_number=sale_payments.receipt_number and sale_payments.use_credit_payment is not null and sale_payments.use_credit_payment <> "" group by payments.receipt_number ) as advance
+
+,DATE(sale_payments.created_at) as created_at_format
+
+,(select branch.branch_prefix from branches branch where branch.id=sale_payments.branch_id group by branch.id) as from_branch
+
+,(select branch.branch_prefix from branches branch where branch.id=commission_branches.branch_id group by branch.id) as to_branch
+
+#,commission_fees.commission_amount as commission_fee
+
+,SUM(DISTINCT commission_fees.commission_amount) as summation_fee
+
+,customers.customer_id
+,customers.name_th
+
+#,contracts.course_name as course_name
+
+from sale_payments
+inner join commission_branches on sale_payments.id=commission_branches.sale_payment_id
+inner join customers on customers.id=sale_payments.customer_id
+left join commission_fees on commission_fees .sale_payment_id=commission_branches.sale_payment_id and commission_fees.treatment_id=commission_branches.treatment_id
+left join contracts on contracts.contract_id=sale_payments.contract_id and contracts.treatment_id=commission_branches.treatment_id
+
+where 
+	commission_branches.commission_amount>0
+and sale_payments.deleted_at is null
+and commission_branches.branch_id='1'
+and date(sale_payments.created_at) between '2023-01-01' and '2023-12-31'
+group by commission_branches.id,commission_fees .sale_payment_id
+order by sale_payments.created_at
+

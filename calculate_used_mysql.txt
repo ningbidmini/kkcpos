@@ -1,0 +1,5 @@
+max connect = 16 - 
+global buffer = keybuffersize + innobufferpoolsize+innologbuffersize+innoadditionalmem_pool_size+netbufferlength+querycachesize
+threadbuffer = sortbuffersize+myisamsortbuffersize+readbuffersize+joinbuffersize+readrndbuffersize+threadstack
+
+global = keybuff(4G) + innobuffpoolsize(14G)+innologbuffersize(8M)+

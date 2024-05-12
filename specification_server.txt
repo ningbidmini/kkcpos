@@ -1,0 +1,10 @@
+CPU 8
+	CPU 8
+	Core per socket 8
+	Thread per core 1
+	
+Ram 16G
+HDD80 GB
+	Model none
+	memory 80G
+	name VDA

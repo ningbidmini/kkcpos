@@ -1,0 +1,39 @@
+select 
+#commission_branches.id
+sale_payments.receipt_number
+#,commission_branches.commission_percent
+,commission_branches.commission_amount
+#,commission_branches.branch_id as commission_branch_id
+#,commission_branches.treatment_id
+#,commission_branches.created_at
+,DATE(sale_payments.created_at) as created_at_format
+#,sale_payments.id as payment_id
+#,sale_payments.total_pay as payment_total_pay
+#,sale_payments.created_at as payment_created_at
+#,sale_payments.course_id
+#,sale_payments.contract_id
+#,sale_payments.use_credit_payment
+,case when (select count(customers.customer_id) from customers where customers.id=sale_payments.customer_id group by customers.id)>0 then (select customers.customer_id from customers where customers.id=sale_payments.customer_id group by customers.id) else 0
+end as customer_id
+,case when (select count(customers.name_th) from customers where customers.id=sale_payments.customer_id group by customers.id)>0 then (select customers.name_th from customers where customers.id=sale_payments.customer_id group by customers.id) else 0
+end as name_th
+
+
+
+,(select branch.branch_prefix from branches branch where branch.id=sale_payments.branch_id group by branch.id) as from_branch
+,(select branch.branch_prefix from branches branch where branch.id=commission_branches.branch_id group by branch.id) as to_branch
+
+
+
+
+from commission_branches
+inner join sale_payments on sale_payments.id=commission_branches.sale_payment_id
+
+where sale_payments.deleted_at is null
+and commission_branches.id
+and date(sale_payments.created_at) between '2023-01-01' and '2023-12-31'
+and commission_branches.branch_id=1
+and commission_branches.commission_amount>0
+group by commission_branches.id
+order by sale_payments.created_at
+limit 0 ,40000

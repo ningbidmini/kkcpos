@@ -1,0 +1,34 @@
+select
+sale_payments.receipt_number
+,commission_branches.commission_amount
+,DATE(sale_payments.created_at) as created_at_format
+,case when (select count(customers.customer_id) from customers where customers.id=sale_payments.customer_id group by customers.id)>0 then (select customers.customer_id from customers where customers.id=sale_payments.customer_id group by customers.id) else 0
+end as customer_id
+,case when (select count(customers.name_th) from customers where customers.id=sale_payments.customer_id group by customers.id)>0 then (select customers.name_th from customers where customers.id=sale_payments.customer_id group by customers.id) else 0
+end as name_th
+
+,case when (select count(DISTINCT contracts.course_name) from contracts where contracts.contract_id=sale_payments.contract_id and contracts.treatment_id=commission_branches.treatment_id order by contracts.id asc limit 1  )>0 then (select DISTINCT contracts.course_name from contracts where contracts.contract_id=sale_payments.contract_id and contracts.treatment_id=commission_branches.treatment_id  order by contracts.id asc  limit 1) when (select count(credit_sale_histories.course_id) from credit_sale_histories where credit_sale_histories.course_id=sale_payments.course_id limit 1 )>0 then (select credit_sales_types.name from credit_sale_histories inner join credit_sales_types on credit_sales_types.id=credit_sale_histories.saleable_id where credit_sale_histories.course_id=sale_payments.course_id group by credit_sale_histories.course_id limit 1 ) else 0 end as course_name
+
+,case when (select count(payments.receipt_number) from sale_payments payments where payments.receipt_number=sale_payments.receipt_number and payments.use_credit_payment is not null and payments.use_credit_payment <> '' group by payments.receipt_number ) >0 then (select sum(payments.total_pay)*commission_branches.commission_percent/100 from sale_payments payments where payments.receipt_number=sale_payments.receipt_number and payments.use_credit_payment is not null and payments.use_credit_payment <> '' group by payments.receipt_number) end as advance
+
+,case when ( select sum(distinct commission_fees.commission_amount) from commission_fees where commission_fees.sale_payment_id=commission_branches.sale_payment_id and commission_fees.treatment_id=commission_branches.treatment_id ) >0 then ( select sum(distinct commission_fees.commission_amount)*commission_branches.commission_percent/100 from commission_fees where commission_fees.sale_payment_id=commission_branches.sale_payment_id and commission_fees.treatment_id=commission_branches.treatment_id ) else 0 end as fee
+
+,case when ( select sum(distinct commission_fees.commission_amount)*commission_branches.commission_percent/100 from commission_fees where commission_fees.sale_payment_id=commission_branches.sale_payment_id and commission_fees.treatment_id=commission_branches.treatment_id ) > 0 then ( commission_branches.commission_amount-( select sum(distinct commission_fees.commission_amount)*commission_branches.commission_percent/100 from commission_fees where commission_fees.sale_payment_id=commission_branches.sale_payment_id and commission_fees.treatment_id=commission_branches.treatment_id ) ) when ( select sum(distinct commission_fees.commission_amount)*commission_branches.commission_percent/100 from commission_fees where commission_fees.sale_payment_id=commission_branches.sale_payment_id and commission_fees.treatment_id=commission_branches.treatment_id )=0 then ( commission_branches.commission_amount-( select sum(distinct commission_fees.commission_amount)*commission_branches.commission_percent/100 from commission_fees where commission_fees.sale_payment_id=commission_branches.sale_payment_id and commission_fees.treatment_id=commission_branches.treatment_id ) ) else commission_branches.commission_amount end as commission_net
+
+
+
+
+,(select branch.branch_prefix from branches branch where branch.id=sale_payments.branch_id group by branch.id) as from_branch
+,(select branch.branch_prefix from branches branch where branch.id=commission_branches.branch_id group by branch.id) as to_branch
+
+from commission_branches
+inner join sale_payments on sale_payments.id=commission_branches.sale_payment_id
+
+where sale_payments.deleted_at is null
+and commission_branches.id
+and date(sale_payments.created_at) between '2023-01-01' and '2023-12-31'
+and commission_branches.branch_id=1
+and commission_branches.commission_amount>0
+group by commission_branches.id
+order by sale_payments.created_at
+limit 0 ,40000
